@@ -8,4 +8,8 @@ Atualmente utilizando o MediaPipe do Google pois, segundo minha pesquisas, é o 
 A detecção facial não é muito eficiente, verei se vou usar algum modelo do TFlite que é, teoricamente, melhor
 
 
+--->> Preciso de Dados melhores.
+Se possivel tirar uma foto de uma sala cm fotos de cada pessoa na sala, para fazer testes mais condizentes 
+
+
 
