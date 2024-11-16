@@ -11,9 +11,7 @@ mp_drawing_styles = mp.solutions.drawing_styles
 
 REGISTERED_FACES_FILE = "registered_faces.json"
 ATTENDANCE_FILE = "attendance.json"
-
-# image_path é a imagem que deve ser tirada
-image_path = "image.jpg"
+image_path = "image2.jpg"
 
 def load_data(file_path):
     if os.path.exists(file_path):
@@ -29,44 +27,52 @@ registered_faces = {k: np.array(v) for k, v in load_data(REGISTERED_FACES_FILE).
 attendance = load_data(ATTENDANCE_FILE)
 
 def calculate_similarity(embedding1, embedding2):
-    print(np.linalg.norm(embedding1 - embedding2))
     return np.linalg.norm(embedding1 - embedding2)
 
 def register_attendance(name):
-    #if name not in attendance:
     time_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     attendance[name] = time_now
-    save_data(attendance, ATTENDANCE_FILE)
     print(f"{name} marcou presença às {time_now}")
+    save_data(attendance, ATTENDANCE_FILE)
+    
 
 def register_aluno(face_mesh, image):
     print("Registrando novo aluno...")
-
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = face_mesh.process(rgb_image)
 
     if results.multi_face_landmarks:
         for face_landmarks in results.multi_face_landmarks:
-            embedding = np.array([face_landmarks.landmark[i].x for i in range(100)])
-
+            embedding = np.array([face_landmarks.landmark[i].x for i in range(len(face_landmarks.landmark))])
             new_name = input("Digite o nome do novo aluno: ").strip()
 
-            if new_name in registered_faces:
+            # Recarregar os dados para garantir que registros antigos não sejam perdidos
+            current_faces = load_data(REGISTERED_FACES_FILE)
+            current_faces = {k: np.array(v) for k, v in current_faces.items()}  # Convert listas para arrays
+
+            if new_name in current_faces:
                 print(f"Aluno {new_name} já está registrado!")
                 return
 
-            registered_faces[new_name] = embedding.tolist()
-            save_data(registered_faces, REGISTERED_FACES_FILE)
+            # Adicionar o novo aluno
+            current_faces[new_name] = embedding
+
+            # Salvar convertendo os arrays novamente para listas
+            save_data({k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in current_faces.items()}, REGISTERED_FACES_FILE)
             print(f"Aluno {new_name} registrado com sucesso!")
             return
 
     print("Nenhum rosto detectado. Tente novamente.")
 
+
+
 image = cv2.imread(image_path)
 
 if image is None:
-    print("Erro: Não foi possível carregar a imagem. Verifique o caminho.")
-else:
+    image_path = input("Erro: Caminho da imagem incorreto. Insira um novo caminho: ").strip()
+    image = cv2.imread(image_path)
+
+if image is not None:
     with mp_face_mesh.FaceMesh(
         max_num_faces=5,
         refine_landmarks=True,
@@ -77,17 +83,13 @@ else:
 
         if results.multi_face_landmarks:
             for face_landmarks in results.multi_face_landmarks:
-                embedding = np.array([face_landmarks.landmark[i].x for i in range(100)])
-                
-                # Coloquei so 4 caracteristicas para o embedding para reduzir o tempo de processamento
-                # Ao implementar aumentar o numro
-
+                embedding = np.array([face_landmarks.landmark[i].x for i in range(len(face_landmarks.landmark))])
                 recognized_name = "Desconhecido"
                 min_similarity = float("inf")
                 for name, ref_embedding in registered_faces.items():
                     similarity = calculate_similarity(embedding, np.array(ref_embedding))
-                    print('sim: ', similarity)
-                    if similarity < min_similarity and similarity < 0.1:
+                    print(similarity)
+                    if similarity < min_similarity and similarity < 0.4:
                         recognized_name = name
                         min_similarity = similarity
 
@@ -108,9 +110,11 @@ else:
         cv2.imwrite(output_path, image)
         print(f"Imagem processada salva em: {output_path}")
 
-        cv2.imshow("Imagem Processada", image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        try:
+            cv2.imshow("Imagem Processada", image)
+            cv2.waitKey(0)
+        finally:
+            cv2.destroyAllWindows()
 
 print("\nRegistro de Presença:")
 for name, time in attendance.items():
