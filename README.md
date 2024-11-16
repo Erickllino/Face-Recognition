@@ -11,5 +11,10 @@ A detecção facial não é muito eficiente, verei se vou usar algum modelo do T
 --->> Preciso de Dados melhores.
 Se possivel tirar uma foto de uma sala cm fotos de cada pessoa na sala, para fazer testes mais condizentes 
 
+### 16/11
+
+Os algoritmos de detecção faciall mobile, ate entao, não sao muito bons para mutiplas faces.
+Funciona bem para uma face Centralizada, focarei na parte de reconhecimento facial, faces ja conhecidas
+serao salvas em um arquivo .json
 
 
