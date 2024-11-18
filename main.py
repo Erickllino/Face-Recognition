@@ -11,7 +11,7 @@ mp_drawing_styles = mp.solutions.drawing_styles
 
 REGISTERED_FACES_FILE = "registered_faces.json"
 ATTENDANCE_FILE = "attendance.json"
-image_path = "image2.jpg"
+image_path = "img.jpg"
 
 def load_data(file_path):
     if os.path.exists(file_path):
@@ -27,7 +27,8 @@ registered_faces = {k: np.array(v) for k, v in load_data(REGISTERED_FACES_FILE).
 attendance = load_data(ATTENDANCE_FILE)
 
 def calculate_similarity(embedding1, embedding2):
-    return np.linalg.norm(embedding1 - embedding2)
+    return np.linalg.norm(embedding1 - embedding2) 
+
 
 def register_attendance(name):
     time_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -87,6 +88,8 @@ if image is not None:
                 recognized_name = "Desconhecido"
                 min_similarity = float("inf")
                 for name, ref_embedding in registered_faces.items():
+                    embedding = embedding / np.linalg.norm(embedding)
+                    ref_embedding = ref_embedding / np.linalg.norm(ref_embedding)
                     similarity = calculate_similarity(embedding, np.array(ref_embedding))
                     print(similarity)
                     if similarity < min_similarity and similarity < 0.4:
