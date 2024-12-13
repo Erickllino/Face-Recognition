@@ -1,13 +1,12 @@
 import cv2
-import keras
 from deepface import DeepFace
 from datetime import datetime
 import numpy as np
 import json
 import os
+from pathlib import Path
+import pandas as pd
 
-REGISTERED_FACES_FILE = "registered_faces.json"
-ATTENDANCE_FILE = "attendance.json"
 
 def load_data(file_path):
     if os.path.exists(file_path):
@@ -19,72 +18,107 @@ def save_data(data, file_path):
     with open(file_path, "w") as file:
         json.dump(data, file, indent=4)
 
-registered_faces = load_data(REGISTERED_FACES_FILE)
-attendance = load_data(ATTENDANCE_FILE)
 
-def register_attendance(name):
-    time_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    attendance[name] = time_now
-    print(f"{name} marcou presença às {time_now}")
-    save_data(attendance, ATTENDANCE_FILE)
+def register_attendance(attendance_dict, attendance_csv= None):
+    """ creates a register of the attendance on a certain day
+    the register is made by adding a new column on csv file 
+        Args:
+                attendance_dict: dict with bool values
+                attendance_csv: path to the csv
+    """
 
-def detect_and_register(image):
-    print("Registrando novo aluno...")
-        
-    face_embedding = DeepFace.represent(image, model_name="Facenet")[0]["embedding"]
-    
-    new_name = input("Digite o nome do novo aluno: ").strip()
-
-    if new_name in registered_faces:
-        print(f"Aluno {new_name} já está registrado!")
-        return
-
-    registered_faces[new_name] = face_embedding
-    save_data(registered_faces, REGISTERED_FACES_FILE)
-    print(f"Aluno {new_name} registrado com sucesso!")
-
-def detect_and_recognize(image):
-    
-    detections = DeepFace.extract_faces(image, detector_backend="mtcnn", enforce_detection=True)[0]
-    print(detections)
-    face_embedding = DeepFace.represent(detections, model_name="Facenet")[0]["embedding"]
-
-    recognized_name = "Desconhecido"
-    min_similarity = float("inf")
-    for name, ref_embedding in registered_faces.items():
-        #qual o formato de ref_embedding?
-        similarity = np.linalg.norm(np.array(face_embedding) - np.array(ref_embedding))
-        if similarity < min_similarity and similarity < 0.4:  # Ajuste o limite conforme necessário
-            recognized_name = name
-            min_similarity = similarity
-
-    if recognized_name != "Desconhecido":
-        register_attendance(recognized_name)
+    # the column name corresponds to the date
+    time_now = datetime.now().strftime("%d-%m-%Y")
+    # if there is no csv, create the csv
+    if attendance_csv is None or (not os.path.exists(attendance_csv)):
+        df = pd.DataFrame(list(attendance_dict.items()), columns=['student_id', time_now])
+    # if there is a csv, add a new column
     else:
-        detect_and_register(image)
+        df = pd.read_csv(attendance_csv,index_col= "student_id")
+        df[time_now] = df['student_id'].map(attendance_dict)
+
+    df.to_csv("attendance.csv")
+
+def register_new_students():
+    "function to add new students in the embedding json"
+    NotImplemented
+
+# this function is here to help the case when the students wont all give their images individually
+# just a single pic with all students should be enough to get all the required embeddings
+def register_faces_from_single_pic(images_path):
+
+    detections = DeepFace.extract_faces(images_path, detector_backend="mtcnn", enforce_detection=True)
+
+    for i,detection in enumerate(detections):
+
+        face_image = (255*detection['face']).astype(np.uint8)
+        face_image_rgb = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
+        cv2.imwrite(os.path.join(images_path, f'rosto{i}.png'),face_image_rgb)
+
+# this function is for the case where all the students give a photo
+def detect_and_register(images_folder, force= False):
+    """generate a json file with the embeddings of each student
+        images_folder: the path to a folder that has the image of all the students
+    """
+    # dict with student_id as keys and embeddings as values 
+    registered_faces = {}
+
+    for student_file in os.listdir(images_folder):
+
+        student_id = Path(student_file).stem # removes the file extension from img file name
+        image_path = os.path.join(images_folder, student_file)
+
+        try:
+            face_embedding = DeepFace.represent(image_path, model_name="Facenet")[0]["embedding"]
+        except:
+            print(f"erro com a imagem: {student_file}")
+            continue
+
+        if student_id in registered_faces and (not force):
+            print(f"Aluno {student_id} já está registrado!")
+            continue
+
+        registered_faces[student_id] = face_embedding
+        print(f"Aluno {student_id} registrado com sucesso!")
+
+    # save embeddings
+    faces_db_folder = os.path.dirname(images_folder)
+    faces_db_path = os.path.join(faces_db_folder,"faces_embeddings.json")
+    with open(faces_db_path, "w") as faces_f:
+        json.dump(registered_faces,faces_f)
     
+    return faces_db_path
+
+def detect_and_recognize(image_path, faces_db_path, max_difference = 11):
+    """image_path: path to the image of the classroom in a certain day with all the students in the photo"""
+
+    # read the json with the faces' embeddings
+    with open(faces_db_path, "r") as faces_f:
+        registered_faces = json.load(faces_f)
+
+    attendance_dict = {student_id : False for student_id in registered_faces.keys()}
+
+    # get the embeddings from the faces in the image
+    reps = DeepFace.represent(image_path, model_name="Facenet")
+
+    # iterate through all the faces in the image
+    for rep in reps:
+        face_embedding = rep["embedding"]
+        
+        # for each face search a registered embedding
+        for student_id, ref_embedding in registered_faces.items():
+
+            # euclidean distance between the embeddings
+            difference = np.linalg.norm(np.array(face_embedding) - np.array(ref_embedding))
+
+            # if is more similar than a certain threshold, the presence is registered
+            if difference < max_difference:
+                attendance_dict[student_id] = True
+               
+    
+    register_attendance(attendance_dict)
+
 
 if __name__ == "__main__":
-    REGISTERED_FACES_FILE = "registered_faces.json"
-    ATTENDANCE_FILE = "attendance.json"
-
-    image_path = ""
-    image = cv2.imread(image_path)
-    if image is None:
-        image_path = input("Erro: Caminho da imagem incorreto. Insira um novo caminho: ").strip()
-        image = cv2.imread(image_path)
-
-    if image is not None:
-        
-        detect_and_recognize(image)
-        
-        #detect_and_register(image)
-        
-
-    print("\nRegistro de Presença:")
-    for name, time in attendance.items():
-        print(f"{name}: {time}")
-
-    print("\nAlunos Registrados:")
-    for name in registered_faces.keys():
-        print(name)
+    faces_db_path = detect_and_register("Students")
+    detect_and_recognize("Pessoas.jpeg", faces_db_path)
