@@ -11,7 +11,7 @@ mp_drawing_styles = mp.solutions.drawing_styles
 
 REGISTERED_FACES_FILE = "registered_faces.json"
 ATTENDANCE_FILE = "attendance.json"
-image_path = "img.jpg"
+image_path = "image2.jpg"
 
 def load_data(file_path):
     if os.path.exists(file_path):
@@ -47,7 +47,7 @@ def register_aluno(face_mesh, image):
             embedding = np.array([face_landmarks.landmark[i].x for i in range(len(face_landmarks.landmark))])
             new_name = input("Digite o nome do novo aluno: ").strip()
 
-            # Recarregar os dados para garantir que registros antigos não sejam perdidos
+            
             current_faces = load_data(REGISTERED_FACES_FILE)
             current_faces = {k: np.array(v) for k, v in current_faces.items()}  # Convert listas para arrays
 
@@ -55,10 +55,10 @@ def register_aluno(face_mesh, image):
                 print(f"Aluno {new_name} já está registrado!")
                 return
 
-            # Adicionar o novo aluno
+            
             current_faces[new_name] = embedding
 
-            # Salvar convertendo os arrays novamente para listas
+            
             save_data({k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in current_faces.items()}, REGISTERED_FACES_FILE)
             print(f"Aluno {new_name} registrado com sucesso!")
             return
