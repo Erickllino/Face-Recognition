@@ -45,15 +45,15 @@ def register_new_students():
 
 # this function is here to help the case when the students wont all give their images individually
 # just a single pic with all students should be enough to get all the required embeddings
-def register_faces_from_single_pic(images_path):
+def register_faces_from_single_pic(images_folder):
 
-    detections = DeepFace.extract_faces(images_path, detector_backend="mtcnn", enforce_detection=True)
+    detections = DeepFace.extract_faces(images_folder, detector_backend="mtcnn", enforce_detection=True)
 
     for i,detection in enumerate(detections):
 
         face_image = (255*detection['face']).astype(np.uint8)
         face_image_rgb = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
-        cv2.imwrite(os.path.join(images_path, f'rosto{i}.png'),face_image_rgb)
+        cv2.imwrite(os.path.join(images_folder, f'rosto{i}.png'),face_image_rgb)
 
 # this function is for the case where all the students give a photo
 def detect_and_register(images_folder, force= False):
