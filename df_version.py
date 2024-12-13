@@ -8,7 +8,6 @@ import os
 
 REGISTERED_FACES_FILE = "registered_faces.json"
 ATTENDANCE_FILE = "attendance.json"
-image_path = "image2.jpg"
 
 def load_data(file_path):
     if os.path.exists(file_path):
@@ -31,59 +30,61 @@ def register_attendance(name):
 
 def detect_and_register(image):
     print("Registrando novo aluno...")
-    try:
         
-        face_embedding = DeepFace.represent(image, model_name="Facenet")[0]["embedding"]
-        
-        new_name = input("Digite o nome do novo aluno: ").strip()
+    face_embedding = DeepFace.represent(image, model_name="Facenet")[0]["embedding"]
+    
+    new_name = input("Digite o nome do novo aluno: ").strip()
 
-        if new_name in registered_faces:
-            print(f"Aluno {new_name} já está registrado!")
-            return
+    if new_name in registered_faces:
+        print(f"Aluno {new_name} já está registrado!")
+        return
 
-        registered_faces[new_name] = face_embedding
-        save_data(registered_faces, REGISTERED_FACES_FILE)
-        print(f"Aluno {new_name} registrado com sucesso!")
-    except Exception as e:
-        print("Erro ao registrar aluno:", e)
+    registered_faces[new_name] = face_embedding
+    save_data(registered_faces, REGISTERED_FACES_FILE)
+    print(f"Aluno {new_name} registrado com sucesso!")
 
 def detect_and_recognize(image):
-    try:
-        detections = DeepFace.extract_faces(image, detector_backend="mtcnn", enforce_detection=True)[0]
+    
+    detections = DeepFace.extract_faces(image, detector_backend="mtcnn", enforce_detection=True)[0]
+    print(detections)
+    face_embedding = DeepFace.represent(detections, model_name="Facenet")[0]["embedding"]
 
-        face_embedding = DeepFace.represent(detections, model_name="Facenet")[0]["embedding"]
+    recognized_name = "Desconhecido"
+    min_similarity = float("inf")
+    for name, ref_embedding in registered_faces.items():
+        #qual o formato de ref_embedding?
+        similarity = np.linalg.norm(np.array(face_embedding) - np.array(ref_embedding))
+        if similarity < min_similarity and similarity < 0.4:  # Ajuste o limite conforme necessário
+            recognized_name = name
+            min_similarity = similarity
 
-        recognized_name = "Desconhecido"
-        min_similarity = float("inf")
-        for name, ref_embedding in registered_faces.items():
-            similarity = np.linalg.norm(np.array(face_embedding) - np.array(ref_embedding))
-            if similarity < min_similarity and similarity < 0.4:  # Ajuste o limite conforme necessário
-                recognized_name = name
-                min_similarity = similarity
+    if recognized_name != "Desconhecido":
+        register_attendance(recognized_name)
+    else:
+        detect_and_register(image)
+    
 
-        if recognized_name != "Desconhecido":
-            register_attendance(recognized_name)
-        else:
-            detect_and_register(image)
-    except Exception as e:
-        print("Erro ao reconhecer aluno:", e)
+if __name__ == "__main__":
+    REGISTERED_FACES_FILE = "registered_faces.json"
+    ATTENDANCE_FILE = "attendance.json"
 
-image = cv2.imread(image_path)
-if image is None:
-    image_path = input("Erro: Caminho da imagem incorreto. Insira um novo caminho: ").strip()
+    image_path = ""
     image = cv2.imread(image_path)
+    if image is None:
+        image_path = input("Erro: Caminho da imagem incorreto. Insira um novo caminho: ").strip()
+        image = cv2.imread(image_path)
 
-if image is not None:
-    
-    detect_and_recognize(image)
-    
-    #detect_and_register(image)
-    
+    if image is not None:
+        
+        detect_and_recognize(image)
+        
+        #detect_and_register(image)
+        
 
-print("\nRegistro de Presença:")
-for name, time in attendance.items():
-    print(f"{name}: {time}")
+    print("\nRegistro de Presença:")
+    for name, time in attendance.items():
+        print(f"{name}: {time}")
 
-print("\nAlunos Registrados:")
-for name in registered_faces.keys():
-    print(name)
+    print("\nAlunos Registrados:")
+    for name in registered_faces.keys():
+        print(name)
